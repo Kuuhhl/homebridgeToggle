@@ -9,6 +9,9 @@ base_url = os.environ.get("HOMEBRIDGE_BASE_URL")
 # Unique IDs of lights to toggle
 lights_uniqueIds = []
 
+# amount of time to wait before starting in seconds (e.g. to wait for homebridge to start)
+INITIAL_SLEEP = 30
+
 # polling interval in seconds
 POLLING_INTERVAL = 30
 

@@ -1,11 +1,14 @@
+import sys
 import time
 import logging
+import argparse
 import requests
 from config import (
     sync_file_url,
     base_url,
     lights_uniqueIds,
     POLLING_INTERVAL,
+    INITIAL_SLEEP,
     homebridge_username,
     homebridge_password,
 )
@@ -92,13 +95,52 @@ class HomeBridgeController:
 
 
 if __name__ == "__main__":
-    time.sleep(30)
+    parser = argparse.ArgumentParser(description='Homebridge Light Sync')
+    parser.add_argument('-L', '--list', action='store_true', help='List all accessories')
+
+    args = parser.parse_args()
+
+    if args.list or not lights_uniqueIds:
+        if not lights_uniqueIds:
+            print("No lights to toggle. Specify unique light-ids in config.py to use this script.")
+            print("The following unique IDs are available:")
+
+        controller = HomeBridgeController()
+        accessories = controller.get_accessories()
+
+        if not accessories:
+            print("Accessories could not be fetched. Exiting.")
+            sys.exit(1)
+
+        for accessory in accessories:
+            print(f"Name: {accessory.get('serviceName')}\nUnique ID: {accessory.get('uniqueId')}\n")
+
+        sys.exit(0)
+    
+    # check for all environment variables specified
+    env_vars = {
+        "sync_file_url": sync_file_url, 
+        "base_url": base_url, 
+        "homebridge_username": homebridge_username, 
+        "homebridge_password": homebridge_password
+    }
+
+    unspecified_vars = [name for name, value in env_vars.items() if value is None]
+
+    if unspecified_vars:
+        print(f"Please specify all required environment variables!\nVariable(s) not specified: {', '.join(unspecified_vars)}")
+        sys.exit(1)
+
     logging.basicConfig(
         filename="app.log",
         filemode="w",
         format="%(name)s - %(levelname)s - %(message)s",
         level=logging.DEBUG,
     )
+    if INITIAL_SLEEP > 0:
+        logging.info(f"Waiting for {INITIAL_SLEEP} seconds before starting...")
+        time.sleep(INITIAL_SLEEP)  # Wait for Homebridge to start
+
     controller = HomeBridgeController()
     light_states = {}
     old_phone_is_home = None
