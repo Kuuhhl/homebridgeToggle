@@ -23,7 +23,18 @@ class HomeBridgeController:
             return response.json()
         except requests.exceptions.RequestException as e:
             logging.error(f"Request to {url} failed with error: {e}")
-            return None
+            if response.status_code == 401:
+                # If the response status code is 401 (Unauthorized), re-authenticate
+                logging.info("Re-authenticating...")
+                self.auth_token = self.authenticate()  # Re-authenticate
+                # Retry the request with the new token
+                kwargs['headers'] = {"Authorization": f"Bearer {self.auth_token}"}
+                response = method(url, **kwargs)
+                response.raise_for_status()
+                return response.json()
+            else:
+                logging.error("Non-401 error encountered. Request cannot be retried.")
+                return None
 
     def authenticate(self):
         payload = {"username": homebridge_username, "password": homebridge_password}
@@ -62,7 +73,7 @@ class HomeBridgeController:
             headers={"Authorization": f"Bearer {self.auth_token}"},
             json=payload,
         )
-        return response is not None and response.status_code == 200
+        return response is not None
 
     def save_light_states(self, accessories):
         return {
@@ -81,6 +92,7 @@ class HomeBridgeController:
 
 
 if __name__ == "__main__":
+    time.sleep(30)
     logging.basicConfig(
         filename="app.log",
         filemode="w",
