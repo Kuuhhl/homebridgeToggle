@@ -17,27 +17,32 @@ from config import (
 class HomeBridgeController:
     def __init__(self):
         self.base_url = base_url
-        self.auth_token = self.authenticate()
+        self.auth_token = None
 
-    def make_request(self, method, url, **kwargs):
+    def make_request(self, method, url, retry=False, **kwargs):
+        if self.auth_token and 'headers' not in kwargs:
+            kwargs['headers'] = {"Authorization": f"Bearer {self.auth_token}"}
+        
         try:
             response = method(url, **kwargs)
             response.raise_for_status()
             return response.json()
+        except requests.exceptions.HTTPError as e:
+            if response.status_code == 401 and not retry:
+                logging.info("Re-authenticating due to 401 Unauthorized response...")
+                self.auth_token = self.authenticate()  # Attempt to re-authenticate
+                if self.auth_token:
+                    logging.info("Retrying request with new authentication token...")
+                    return self.make_request(method, url, retry=True, **kwargs)  # Retry the request once
+                else:
+                    logging.error("Authentication failed. Cannot retry request.")
+                    return None
+            else:
+                logging.error(f"Request to {url} failed with error: {e}")
+                return None
         except requests.exceptions.RequestException as e:
             logging.error(f"Request to {url} failed with error: {e}")
-            if response.status_code == 401:
-                # If the response status code is 401 (Unauthorized), re-authenticate
-                logging.info("Re-authenticating...")
-                self.auth_token = self.authenticate()  # Re-authenticate
-                # Retry the request with the new token
-                kwargs['headers'] = {"Authorization": f"Bearer {self.auth_token}"}
-                response = method(url, **kwargs)
-                response.raise_for_status()
-                return response.json()
-            else:
-                logging.error("Non-401 error encountered. Request cannot be retried.")
-                return None
+            return None
 
     def authenticate(self):
         payload = {"username": homebridge_username, "password": homebridge_password}
