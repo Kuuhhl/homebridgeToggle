@@ -1,7 +1,12 @@
 import os
 
-# URL to synced file that contains 1 or 0 in every line
-sync_file_url = os.environ.get("LOCATION_SYNC_FILE_URL")
+# URL to synced files that contains 1 or 0 in every line, split by comma
+if os.environ.get("LOCATION_SYNC_FILE_URLS"):
+    sync_file_urls = [
+        x.strip() for x in os.environ.get("LOCATION_SYNC_FILE_URLS").split(",")
+    ]
+elif os.environ.get("LOCATION_SYNC_FILE_URL"):
+    sync_file_urls = [os.environ.get("LOCATION_SYNC_FILE_URL")]
 
 # URL to homebridge instance
 base_url = os.environ.get("HOMEBRIDGE_BASE_URL")

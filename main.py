@@ -4,7 +4,7 @@ import logging
 import argparse
 import requests
 from config import (
-    sync_file_url,
+    sync_file_urls,
     base_url,
     lights_uniqueIds,
     POLLING_INTERVAL,
@@ -20,9 +20,9 @@ class HomeBridgeController:
         self.auth_token = None
 
     def make_request(self, method, url, retry=False, **kwargs):
-        if self.auth_token and 'headers' not in kwargs:
-            kwargs['headers'] = {"Authorization": f"Bearer {self.auth_token}"}
-        
+        if self.auth_token and "headers" not in kwargs:
+            kwargs["headers"] = {"Authorization": f"Bearer {self.auth_token}"}
+
         try:
             response = method(url, **kwargs)
             response.raise_for_status()
@@ -33,7 +33,9 @@ class HomeBridgeController:
                 self.auth_token = self.authenticate()  # Attempt to re-authenticate
                 if self.auth_token:
                     logging.info("Retrying request with new authentication token...")
-                    return self.make_request(method, url, retry=True, **kwargs)  # Retry the request once
+                    return self.make_request(
+                        method, url, retry=True, **kwargs
+                    )  # Retry the request once
                 else:
                     logging.error("Authentication failed. Cannot retry request.")
                     return None
@@ -54,16 +56,18 @@ class HomeBridgeController:
         return data.get("access_token")
 
     @staticmethod
-    def is_phone_home():
-        for _ in range(3):
-            try:
-                response = requests.get(sync_file_url)
-                response.raise_for_status()
-                return response.text.split("\n")[-1].strip() == "1"
-            except requests.exceptions.RequestException as e:
-                logging.error(f"Request failed with {e}, retrying...")
-                time.sleep(1)
-        logging.error("Failed to fetch phone home status after 3 attempts.")
+    def is_phone_home(sync_file_urls):
+        for sync_file_url in sync_file_urls:
+            for _ in range(3):
+                try:
+                    response = requests.get(sync_file_url)
+                    response.raise_for_status()
+                    if response.text.split("\n")[-1].strip() == "1":
+                        return True
+                except requests.exceptions.RequestException as e:
+                    logging.error(f"Request failed with {e}, retrying...")
+                    time.sleep(1)
+            logging.error("Failed to fetch phone home status after 3 attempts.")
         return False
 
     def get_accessories(self):
@@ -100,14 +104,18 @@ class HomeBridgeController:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Homebridge Light Sync')
-    parser.add_argument('-L', '--list', action='store_true', help='List all accessories')
+    parser = argparse.ArgumentParser(description="Homebridge Light Sync")
+    parser.add_argument(
+        "-L", "--list", action="store_true", help="List all accessories"
+    )
 
     args = parser.parse_args()
 
     if args.list or not lights_uniqueIds:
         if not lights_uniqueIds:
-            print("No lights to toggle. Specify unique light-ids in config.py to use this script.")
+            print(
+                "No lights to toggle. Specify unique light-ids in config.py to use this script."
+            )
             print("The following unique IDs are available:")
 
         controller = HomeBridgeController()
@@ -118,22 +126,26 @@ if __name__ == "__main__":
             sys.exit(1)
 
         for accessory in accessories:
-            print(f"Name: {accessory.get('serviceName')}\nUnique ID: {accessory.get('uniqueId')}\n")
+            print(
+                f"Name: {accessory.get('serviceName')}\nUnique ID: {accessory.get('uniqueId')}\n"
+            )
 
         sys.exit(0)
-    
+
     # check for all environment variables specified
     env_vars = {
-        "sync_file_url": sync_file_url, 
-        "base_url": base_url, 
-        "homebridge_username": homebridge_username, 
-        "homebridge_password": homebridge_password
+        "sync_file_urls": sync_file_urls,
+        "base_url": base_url,
+        "homebridge_username": homebridge_username,
+        "homebridge_password": homebridge_password,
     }
 
     unspecified_vars = [name for name, value in env_vars.items() if value is None]
 
     if unspecified_vars:
-        print(f"Please specify all required environment variables!\nVariable(s) not specified: {', '.join(unspecified_vars)}")
+        print(
+            f"Please specify all required environment variables!\nVariable(s) not specified: {', '.join(unspecified_vars)}"
+        )
         sys.exit(1)
 
     logging.basicConfig(
